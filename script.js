@@ -124,14 +124,44 @@
             // If the piece would lock with blocks above visible area, it's a top-out
             if (pieceOverflowsTop(current)) { running = false; gameOver = true; hooks?.onGameOver?.({ score, lines, level }); return; }
             merge(board, current);
-            const cleared = clearLines(board);
-            if (cleared) {
+            // Determine fully filled rows
+            const fullRows = [];
+            for (let y = 0; y < ROWS; y++) {
+                let full = true;
+                for (let x = 0; x < COLS; x++) { if (board[y][x] === EMPTY) { full = false; break; } }
+                if (full) fullRows.push(y);
+            }
+            let cleared = 0;
+            if (fullRows.length === 1) {
+                // Single-line: only clear if we can cancel at least one garbage row
+                // Check if there exists a garbage row to cancel
+                let hasGarbage = false;
+                for (let y = ROWS - 1; y >= 0; y--) { if (isGarbageRow(board[y])) { hasGarbage = true; break; } }
+                if (hasGarbage) {
+                    // Clear the single filled row
+                    const y = fullRows[0];
+                    board.splice(y, 1);
+                    board.unshift(Array(COLS).fill(EMPTY));
+                    cleared = 1;
+                    // Cancel one garbage row
+                    removeGarbageRows(1);
+                }
+            } else if (fullRows.length >= 2) {
+                // Clear multiple rows
+                // Remove from bottom to top to preserve indices
+                for (let i = fullRows.length - 1; i >= 0; i--) {
+                    const y = fullRows[i];
+                    board.splice(y, 1);
+                    board.unshift(Array(COLS).fill(EMPTY));
+                }
+                cleared = fullRows.length;
+                // Update stats and cancel/send
                 score += scoreFor(cleared) * level;
                 lines += cleared;
                 setLevel();
                 const cancelled = removeGarbageRows(cleared);
                 const send = Math.max(0, cleared - cancelled);
-                hooks?.onLinesCleared?.(send);
+                if (send >= 2) hooks?.onLinesCleared?.(send);
             }
             spawn();
             updateHUD();
