@@ -101,7 +101,7 @@
         let botPlan = null, botMoveTimer = 0;
 
         function updateHUD() { scoreEl.textContent = score; linesEl.textContent = lines; levelEl.textContent = level; hooks?.onState?.({ score, lines, level }); }
-        function spawn() { current = { type: next, rot: 0, shape: SHAPES[next][0], x: 3, y: -2 }; next = createPiece(rand).type; drawNext(nextCtx, next); if (collide(board, current)) { running = false; gameOver = true; overlayEl.classList.add("show"); overlayEl.textContent = "GAME OVER"; hooks?.onGameOver?.({ score, lines, level }); } if (isBot) botPlan = null; }
+        function spawn() { current = { type: next, rot: 0, shape: SHAPES[next][0], x: 3, y: -2 }; next = createPiece(rand).type; drawNext(nextCtx, next); if (collide(board, current)) { running = false; gameOver = true; hooks?.onGameOver?.({ score, lines, level }); } if (isBot) botPlan = null; }
         function setLevel() { const newLevel = Math.floor(lines / 10) + 1; if (newLevel !== level) { level = newLevel; if (!isBot) { dropInterval = Math.max(120, 1000 - (level - 1) * 90); } } }
         function hardDrop() { while (!collide(board, { ...current, y: current.y + 1 })) current.y++; lockPiece(); }
         function isGarbageRow(row) {
@@ -122,7 +122,7 @@
         function pieceOverflowsTop(p) { for (let y = 0; y < p.shape.length; y++) { for (let x = 0; x < p.shape[y].length; x++) { if (p.shape[y][x] && (p.y + y) < 0) return true; } } return false; }
         function lockPiece() {
             // If the piece would lock with blocks above visible area, it's a top-out
-            if (pieceOverflowsTop(current)) { running = false; gameOver = true; overlayEl.classList.add('show'); overlayEl.textContent = 'GAME OVER'; hooks?.onGameOver?.({ score, lines, level }); return; }
+            if (pieceOverflowsTop(current)) { running = false; gameOver = true; hooks?.onGameOver?.({ score, lines, level }); return; }
             merge(board, current);
             const cleared = clearLines(board);
             if (cleared) {
@@ -149,7 +149,7 @@
             // If current piece now collides due to push-up, try shifting upward
             while (collide(board, current) && current.y > -6) current.y -= 1;
             if (collide(board, current)) { // still colliding even above hidden rows
-                running = false; gameOver = true; overlayEl.classList.add('show'); overlayEl.textContent = 'GAME OVER'; hooks?.onGameOver?.({ score, lines, level }); return;
+                running = false; gameOver = true; hooks?.onGameOver?.({ score, lines, level }); return;
             }
             updateHUD();
         }
@@ -202,10 +202,6 @@
                     finished = true;
                     bot.pause();
                     human.pause();
-                    const hOv = document.getElementById('humanOverlay');
-                    const bOv = document.getElementById('botOverlay');
-                    hOv.classList.add('show'); hOv.textContent = 'GAME OVER';
-                    bOv.classList.add('show'); bOv.textContent = 'GAME OVER';
                     showToast('Game Over!!! Human side finished');
                     openModal(score, Number(document.getElementById('bScore').textContent));
                 }
@@ -232,10 +228,6 @@
                     finished = true;
                     bot.pause();
                     human.pause();
-                    const hOv = document.getElementById('humanOverlay');
-                    const bOv = document.getElementById('botOverlay');
-                    hOv.classList.add('show'); hOv.textContent = 'GAME OVER';
-                    bOv.classList.add('show'); bOv.textContent = 'GAME OVER';
                     showToast('Game Over!!! Bot side finished');
                     openModal(Number(document.getElementById('hScore').textContent), score);
                 }
@@ -251,7 +243,7 @@
     document.getElementById('pauseBtn').addEventListener('click', () => { human.pause(); bot.pause(); document.getElementById('humanOverlay').classList.add('show'); document.getElementById('humanOverlay').textContent = 'PAUSED'; document.getElementById('botOverlay').classList.add('show'); document.getElementById('botOverlay').textContent = 'PAUSED'; });
     document.getElementById('restartBtn').addEventListener('click', () => { closeModal(); finished = false; human.restart(); bot.restart(); });
     document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
-    document.getElementById('modalPlayBtn').addEventListener('click', () => { closeModal(); human.restart(); bot.restart(); human.start(); bot.start(); });
+    document.getElementById('modalPlayBtn').addEventListener('click', () => { closeModal(); finished = false; human.restart(); bot.restart(); human.start(); bot.start(); });
 
     // Human controls
     window.addEventListener('keydown', (e) => {
