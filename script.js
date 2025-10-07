@@ -3,7 +3,7 @@
     const ROWS = 20;
     const BLOCK = 24;
     const EMPTY = 0;
-    const COLORS = { I: "#5ce1e6", J: "#5c7cff", L: "#ff9f5c", O: "#ffd166", S: "#39d98a", T: "#b084ff", Z: "#ff5c7a" };
+    const COLORS = { I: "#5ce1e6", J: "#5c7cff", L: "#ff9f5c", O: "#ffd166", S: "#39d98a", T: "#b084ff", Z: "#ff5c7a", G: "#223447" };
     const SHAPES = {
         I: [
             [[0, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [0, 0, 0, 0]],
@@ -53,7 +53,7 @@
     function scoreFor(lines) { switch (lines) { case 1: return 100; case 2: return 300; case 3: return 500; case 4: return 800; default: return 0; } }
     function createPiece(nextGen) { const type = nextGen(); return { type, rot: 0, shape: SHAPES[type][0], x: 3, y: -2 }; }
     function ghostY(board, piece) { const t = { ...piece }; while (!collide(board, { ...t, y: t.y + 1 })) t.y++; return t.y; }
-    function drawBoard(ctx, board) { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (board[y][x] !== EMPTY) drawBlock(ctx, x, y, COLORS[board[y][x]]); }
+    function drawBoard(ctx, board) { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (board[y][x] !== EMPTY) drawBlock(ctx, x, y, COLORS[board[y][x]] || COLORS.G); }
     function drawBlock(ctx, x, y, color, alpha = 1) {
         const px = x * 24, py = y * 24;
         ctx.globalAlpha = alpha;
@@ -101,10 +101,58 @@
         let botPlan = null, botMoveTimer = 0;
 
         function updateHUD() { scoreEl.textContent = score; linesEl.textContent = lines; levelEl.textContent = level; hooks?.onState?.({ score, lines, level }); }
-        function spawn() { current = { type: next, rot: 0, shape: SHAPES[next][0], x: 3, y: -2 }; next = createPiece(rand).type; drawNext(nextCtx, next); if (collide(board, current)) { running = false; gameOver = true; overlayEl.classList.add("show"); overlayEl.textContent = "GAME OVER"; if (!isBot) { try { alert("Game Over!!!"); } catch(_){} } hooks?.onGameOver?.({ score, lines, level }); } if (isBot) botPlan = null; }
+        function spawn() { current = { type: next, rot: 0, shape: SHAPES[next][0], x: 3, y: -2 }; next = createPiece(rand).type; drawNext(nextCtx, next); if (collide(board, current)) { running = false; gameOver = true; overlayEl.classList.add("show"); overlayEl.textContent = "GAME OVER"; hooks?.onGameOver?.({ score, lines, level }); } if (isBot) botPlan = null; }
         function setLevel() { const newLevel = Math.floor(lines / 10) + 1; if (newLevel !== level) { level = newLevel; if (!isBot) { dropInterval = Math.max(120, 1000 - (level - 1) * 90); } } }
         function hardDrop() { while (!collide(board, { ...current, y: current.y + 1 })) current.y++; lockPiece(); }
-        function lockPiece() { merge(board, current); const cleared = clearLines(board); if (cleared) { score += scoreFor(cleared) * level; lines += cleared; setLevel(); } spawn(); updateHUD(); }
+        function isGarbageRow(row) {
+            let empties = 0;
+            for (let i = 0; i < COLS; i++) {
+                if (row[i] === EMPTY) empties++;
+                else if (row[i] !== 'G') return false;
+            }
+            return empties === 1; // generated garbage has exactly one hole
+        }
+        function removeGarbageRows(maxCount) {
+            let removed = 0;
+            for (let y = ROWS - 1; y >= 0 && removed < maxCount; y--) {
+                if (isGarbageRow(board[y])) { board.splice(y, 1); board.unshift(Array(COLS).fill(EMPTY)); removed++; y++; }
+            }
+            return removed;
+        }
+        function pieceOverflowsTop(p) { for (let y = 0; y < p.shape.length; y++) { for (let x = 0; x < p.shape[y].length; x++) { if (p.shape[y][x] && (p.y + y) < 0) return true; } } return false; }
+        function lockPiece() {
+            // If the piece would lock with blocks above visible area, it's a top-out
+            if (pieceOverflowsTop(current)) { running = false; gameOver = true; overlayEl.classList.add('show'); overlayEl.textContent = 'GAME OVER'; hooks?.onGameOver?.({ score, lines, level }); return; }
+            merge(board, current);
+            const cleared = clearLines(board);
+            if (cleared) {
+                score += scoreFor(cleared) * level;
+                lines += cleared;
+                setLevel();
+                const cancelled = removeGarbageRows(cleared);
+                const send = Math.max(0, cleared - cancelled);
+                hooks?.onLinesCleared?.(send);
+            }
+            spawn();
+            updateHUD();
+        }
+        function receiveGarbage(count) {
+            if (gameOver) return;
+            for (let i = 0; i < count; i++) {
+                const hole = Math.floor(Math.random() * COLS);
+                // remove top row and push a garbage row at the bottom
+                board.shift();
+                const row = Array(COLS).fill('G');
+                row[hole] = EMPTY;
+                board.push(row);
+            }
+            // If current piece now collides due to push-up, try shifting upward
+            while (collide(board, current) && current.y > -6) current.y -= 1;
+            if (collide(board, current)) { // still colliding even above hidden rows
+                running = false; gameOver = true; overlayEl.classList.add('show'); overlayEl.textContent = 'GAME OVER'; hooks?.onGameOver?.({ score, lines, level }); return;
+            }
+            updateHUD();
+        }
         function move(dir) { const t = { ...current, x: current.x + dir }; if (!collide(board, t)) current = t; }
         function rotate(dir) { const nr = (current.rot + (dir > 0 ? 1 : 3))%4; const r = { ...current, rot: nr, shape: SHAPES[current.type][nr] }; for (const k of [0, -1, 1, -2, 2]) { const t = { ...r, x: current.x + k }; if (!collide(board, t)) { current = t; return; } } }
         function drop() { const t = { ...current, y: current.y + 1 }; if (!collide(board, t)) current = t; else lockPiece(); }
@@ -126,7 +174,7 @@
         function start() { if (gameOver) return; running = true; overlayEl.classList.remove("show"); }
         function pause() { running = false; }
         function restart() { board = createMatrix(COLS, ROWS); current = createPiece(rand); next = createPiece(rand).type; lastTime = 0; dropCounter = 0; dropInterval = isBot ? Math.max(60, Number(document.getElementById("botSpeed").value) || 300) : 1000; score = 0; lines = 0; level = 1; running = false; gameOver = false; botPlan = null; botMoveTimer = 0; updateHUD(); drawNext(nextCtx, next); overlayEl.classList.add("show"); overlayEl.textContent = "PAUSED"; hooks?.onRestart?.(); }
-        return { update, start, pause, restart, move, rotate, drop, hardDrop, get state() { return { running, gameOver, score, lines, level }; } };
+        return { update, start, pause, restart, move, rotate, drop, hardDrop, receiveGarbage, get state() { return { running, gameOver, score, lines, level }; } };
     }
 
     // Create games with hooks
@@ -148,7 +196,23 @@
         document.getElementById('humanOverlay'),
         false,
         {
-            onGameOver: ({ score }) => { if (!finished) { finished = true; bot.pause(); human.pause(); openModal(score, Number(document.getElementById('bScore').textContent)); } },
+            onGameOver: ({ score }) => {
+                if (!finished) {
+                    finished = true;
+                    bot.pause();
+                    human.pause();
+                    const hOv = document.getElementById('humanOverlay');
+                    const bOv = document.getElementById('botOverlay');
+                    hOv.classList.add('show'); hOv.textContent = 'GAME OVER';
+                    bOv.classList.add('show'); bOv.textContent = 'GAME OVER';
+                    try { alert('Game Over!!!'); } catch(_) {}
+                    openModal(score, Number(document.getElementById('bScore').textContent));
+                }
+            },
+            onLinesCleared: (cleared) => {
+                // Send exactly the number of lines cleared as garbage
+                if (cleared > 0) bot.receiveGarbage(cleared);
+            }
         }
     );
     human.update();
@@ -162,7 +226,22 @@
         document.getElementById('botOverlay'),
         true,
         {
-            onGameOver: ({ score }) => { if (!finished) { finished = true; bot.pause(); human.pause(); openModal(Number(document.getElementById('hScore').textContent), score); } },
+            onGameOver: ({ score }) => {
+                if (!finished) {
+                    finished = true;
+                    bot.pause();
+                    human.pause();
+                    const hOv = document.getElementById('humanOverlay');
+                    const bOv = document.getElementById('botOverlay');
+                    hOv.classList.add('show'); hOv.textContent = 'GAME OVER';
+                    bOv.classList.add('show'); bOv.textContent = 'GAME OVER';
+                    try { alert('Game Over!!!'); } catch(_) {}
+                    openModal(Number(document.getElementById('hScore').textContent), score);
+                }
+            },
+            onLinesCleared: (cleared) => {
+                if (cleared > 0) human.receiveGarbage(cleared);
+            }
         }
     );
     bot.update();
