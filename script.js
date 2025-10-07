@@ -54,9 +54,39 @@
     function createPiece(nextGen) { const type = nextGen(); return { type, rot: 0, shape: SHAPES[type][0], x: 3, y: -2 }; }
     function ghostY(board, piece) { const t = { ...piece }; while (!collide(board, { ...t, y: t.y + 1 })) t.y++; return t.y; }
     function drawBoard(ctx, board) { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (board[y][x] !== EMPTY) drawBlock(ctx, x, y, COLORS[board[y][x]]); }
-    function drawBlock(ctx, x, y, color, alpha = 1) { const px = x * 24, py = y * 24; ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fillRect(px, py, 24, 24); ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(px, py, 24, 3); ctx.fillRect(px, py, 3, 24); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(px, py + 21, 24, 3); ctx.fillRect(px + 21, py, 3, 24); ctx.globalAlpha = 1; }
+    function drawBlock(ctx, x, y, color, alpha = 1) {
+        const px = x * 24, py = y * 24;
+        ctx.globalAlpha = alpha;
+        // fill
+        ctx.fillStyle = color;
+        ctx.fillRect(px, py, 24, 24);
+        // bevel
+        ctx.fillStyle = "rgba(255,255,255,0.08)";
+        ctx.fillRect(px, py, 24, 3);
+        ctx.fillRect(px, py, 3, 24);
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.fillRect(px, py + 21, 24, 3);
+        ctx.fillRect(px + 21, py, 3, 24);
+        // crisp border (grid outline)
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#0a0f15";
+        ctx.strokeRect(px + 0.5, py + 0.5, 23, 23);
+        ctx.globalAlpha = 1;
+    }
+    function drawGrid(ctx) {
+        ctx.save();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "#0a0f15";
+        for (let y = 0; y < ROWS; y++) {
+            for (let x = 0; x < COLS; x++) {
+                const px = x * 24, py = y * 24;
+                ctx.strokeRect(px + 0.5, py + 0.5, 23, 23);
+            }
+        }
+        ctx.restore();
+    }
     function drawPiece(ctx, p, gy) { if (gy != null) { for (let y = 0; y < p.shape.length; y++) for (let x = 0; x < p.shape[y].length; x++) if (p.shape[y][x]) drawBlock(ctx, p.x + x, gy + y, COLORS[p.type], 0.15); } for (let y = 0; y < p.shape.length; y++) for (let x = 0; x < p.shape[y].length; x++) if (p.shape[y][x]) drawBlock(ctx, p.x + x, p.y + y, COLORS[p.type]); }
-    function drawNext(ctx, type) { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); if (!type) return; const shape = SHAPES[type][0], color = COLORS[type]; const offsetX = Math.floor((4 - shape[0].length) * 0.5); for (let y = 0; y < shape.length; y++) for (let x = 0; x < shape[y].length; x++) if (shape[y][x]) { const px = (x + offsetX) * 16 + 12, py = y * 16 + 10; ctx.fillStyle = color; ctx.fillRect(px, py, 16, 16); ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(px, py, 16, 2); ctx.fillRect(px, py, 2, 16); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(px, py + 14, 16, 2); ctx.fillRect(px + 14, py, 2, 16); } }
+    function drawNext(ctx, type) { ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); if (!type) return; const shape = SHAPES[type][0], color = COLORS[type]; const offsetX = Math.floor((4 - shape[0].length) * 0.5); for (let y = 0; y < shape.length; y++) for (let x = 0; x < shape[y].length; x++) if (shape[y][x]) { const px = (x + offsetX) * 16 + 12, py = y * 16 + 10; ctx.fillStyle = color; ctx.fillRect(px, py, 16, 16); ctx.strokeStyle = "#0a0f15"; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, py + 0.5, 15, 15); ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(px, py, 16, 2); ctx.fillRect(px, py, 2, 16); ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.fillRect(px, py + 14, 16, 2); ctx.fillRect(px + 14, py, 2, 16); } }
 
     function createGame(canvas, nextCanvas, scoreEl, linesEl, levelEl, overlayEl, isBot, hooks) {
         const ctx = canvas.getContext("2d"); ctx.imageSmoothingEnabled = false;
@@ -71,18 +101,17 @@
         let botPlan = null, botMoveTimer = 0;
 
         function updateHUD() { scoreEl.textContent = score; linesEl.textContent = lines; levelEl.textContent = level; hooks?.onState?.({ score, lines, level }); }
-        function spawn() { current = { type: next, rot: 0, shape: SHAPES[next][0], x: 3, y: -2 }; next = createPiece(rand).type; drawNext(nextCtx, next); if (collide(board, current)) { running = false; gameOver = true; overlayEl.classList.add("show"); overlayEl.textContent = "GAME OVER"; hooks?.onGameOver?.({ score, lines, level }); } if (isBot) botPlan = null; }
+        function spawn() { current = { type: next, rot: 0, shape: SHAPES[next][0], x: 3, y: -2 }; next = createPiece(rand).type; drawNext(nextCtx, next); if (collide(board, current)) { running = false; gameOver = true; overlayEl.classList.add("show"); overlayEl.textContent = "GAME OVER"; if (!isBot) { try { alert("Game Over!!!"); } catch(_){} } hooks?.onGameOver?.({ score, lines, level }); } if (isBot) botPlan = null; }
         function setLevel() { const newLevel = Math.floor(lines / 10) + 1; if (newLevel !== level) { level = newLevel; if (!isBot) { dropInterval = Math.max(120, 1000 - (level - 1) * 90); } } }
         function hardDrop() { while (!collide(board, { ...current, y: current.y + 1 })) current.y++; lockPiece(); }
         function lockPiece() { merge(board, current); const cleared = clearLines(board); if (cleared) { score += scoreFor(cleared) * level; lines += cleared; setLevel(); } spawn(); updateHUD(); }
         function move(dir) { const t = { ...current, x: current.x + dir }; if (!collide(board, t)) current = t; }
-        function rotate(dir) { const nr = (current.rot + (dir > 0 ? 1 : 3)) % 4; const r = { ...current, rot: nr, shape: SHAPES[current.type][nr] }; for (const k of [0, -1, 1, -2, 2]) { const t = { ...r, x: current.x + k }; if (!collide(board, t)) { current = t; return; } } }
+        function rotate(dir) { const nr = (current.rot + (dir > 0 ? 1 : 3))%4; const r = { ...current, rot: nr, shape: SHAPES[current.type][nr] }; for (const k of [0, -1, 1, -2, 2]) { const t = { ...r, x: current.x + k }; if (!collide(board, t)) { current = t; return; } } }
         function drop() { const t = { ...current, y: current.y + 1 }; if (!collide(board, t)) current = t; else lockPiece(); }
-        function draw() { drawBoard(ctx, board); const gy = ghostY(board, current); drawPiece(ctx, current, gy); }
+        function draw() { drawBoard(ctx, board); drawGrid(ctx); const gy = ghostY(board, current); drawPiece(ctx, current, gy); }
         function update(time = 0) {
             if (!running) { lastTime = time; requestAnimationFrame(update); return; }
             const delta = time - lastTime; lastTime = time;
-            // Sync bot fall speed from slider in real time
             if (isBot) { const s = Number(document.getElementById("botSpeed").value); dropInterval = Math.max(60, s || 300); }
             dropCounter += delta;
             if (dropCounter > dropInterval) { drop(); dropCounter = 0; }
