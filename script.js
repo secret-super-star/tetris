@@ -185,6 +185,7 @@
     let finished = false;
 
     function openModal(h, b) { mhScore.textContent = h; mbScore.textContent = b; if (h > b) { winnerText.textContent = 'Human wins!'; } else if (b > h) { winnerText.textContent = 'Bot wins!'; } else { winnerText.textContent = 'Draw!'; } modal.classList.add('show'); }
+    function showToast(text) { const t = document.getElementById('toast'); if (!t) return; t.textContent = text; t.classList.add('show'); clearTimeout(showToast._id); showToast._id = setTimeout(() => t.classList.remove('show'), 2500); }
     function closeModal() { modal.classList.remove('show'); }
 
     const human = createGame(
@@ -205,7 +206,7 @@
                     const bOv = document.getElementById('botOverlay');
                     hOv.classList.add('show'); hOv.textContent = 'GAME OVER';
                     bOv.classList.add('show'); bOv.textContent = 'GAME OVER';
-                    try { alert('Game Over!!!'); } catch(_) {}
+                    showToast('Game Over!!! Human side finished');
                     openModal(score, Number(document.getElementById('bScore').textContent));
                 }
             },
@@ -235,7 +236,7 @@
                     const bOv = document.getElementById('botOverlay');
                     hOv.classList.add('show'); hOv.textContent = 'GAME OVER';
                     bOv.classList.add('show'); bOv.textContent = 'GAME OVER';
-                    try { alert('Game Over!!!'); } catch(_) {}
+                    showToast('Game Over!!! Bot side finished');
                     openModal(Number(document.getElementById('hScore').textContent), score);
                 }
             },
