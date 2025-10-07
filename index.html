@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="main">
+        <div class="game-board">
+            <div class="gameBoard" id="game-board"></div>
+        </div>
+        <div class="game-info">
+            <div class="info-panel">
+                <h3>Score</h3>
+                <div class="score" id="score">0</div>
+                <div class="level">Level: <span id="level">1</span></div>
+                <div class="lines">Lines: <span id="lines">0</span></div>
+            </div>
+            <div class="info-panel">
+                <h3>Next Piece</h3>
+                <div class="next-board" id="nextPiece-board"></div>
+            </div>
+            <div class="button-board">
+                <button id="startBtn">Start Game</button>
+                <button id="pauseBtn">Pause Game</button>
+            </div>
+        </div>
+    </div>
+    <script src="script.js">
+        // const createBoard = () => {
+        //     const gameBoard = document.getElementById('game-board');
+        //     for (let y = 0; y < 20 * 10; y++) {
+        //         const cell = document.createElement('div');
+        //         cell.className = 'cell';
+        //         gameBoard.appendChild(cell);
+        //     }
+        // }
+        // const nextBoard = () => {
+        //     const nextPiece = document.getElementById('next-board');
+        //     for (let y = 0; y < 4 * 4; y++) {
+        //         const cell = document.createElement('div');
+        //         cell.className = 'next-cell';
+        //         nextPiece.appendChild(cell);
+        //     }
+        // }
+        // createBoard();
+        // nextBoard();
+    </script>
+</body>
+
+</html>
